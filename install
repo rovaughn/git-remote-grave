@@ -1,0 +1,2 @@
+#!/bin/bash
+go build && sudo cp git-remote-grave /usr/local/bin
