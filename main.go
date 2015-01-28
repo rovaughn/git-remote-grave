@@ -1,6 +1,8 @@
 //go:generate ./generate-bindata
 package main
 
+// TODO: The temporary unpacking dir should default to the current git dir.
+
 import (
 	"archive/tar"
 	"bufio"
