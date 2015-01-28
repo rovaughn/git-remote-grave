@@ -18,7 +18,7 @@ Example with a local file:
     $ git fetch backup
 
 Example with HTTP:
-  
+
     $ git clone grave::https://filegrave.com/username/private-repo
     Cloning into 'private-repo'...
     Checking connectivity... done.
@@ -26,25 +26,29 @@ Example with HTTP:
 Using a key
 -----------
 
-If GRAVEKEY is set to a filename, then that file is read to determine the key;
-otherwise, it is assumed the key is in `.gravekey` under the repository's root
-directory.
+The encryption key is produced by taking the SHA256 hash of a keysource.  The
+keysource can be of any length; leading and trailing whitespace is stripped so
+that trailing newlines are not an issue.
 
-The contents of keyfile will be hashed by SHA256 to derive the key.  Leading
-and trailing whitespace is ignored, so that you don't have to worry if there
-is a trailing newline.
+If a key has not been set for the repository, then git-remote-grave will
+interactively determine the key.  In all cases, the keysource will be ultimately
+copied to `.git/grave/remotename/key` with 600 permissions.
 
-If you want to generate a new key, you can use the following command.
+Three options are provided:
 
-    git-remote-grave create-key keyfile
+1. Enter the keysource by typing a string.  The characters will not be echoed,
+   like a password.
+2. Specify an existing file as the keysource.
+3. Randomly generate a new key.  Most secure.  Only when pushing.
 
-It will create keyfile with 600 permissions and populate it with a randomly
-generated hex string.
+You can also set the environment variable `GRAVE_KEYFILE` to a file to use as
+the keysource.  This may be useful in scripts.
 
 Encryption
 ----------
 
-The package [golang.org/x/crypto/nacl/secretbox](https://godoc.org/golang.org/x/crypto/nacl/secretbox),
+The package
+[golang.org/x/crypto/nacl/secretbox](https://godoc.org/golang.org/x/crypto/nacl/secretbox),
 which is a port of [DJB's NaCl](http://nacl.cr.yp.to/), is used to encrypt and
 authenticate repositories.  The nonce is randomly generated every time the
 repository is encrypted, so that two identical repositories encrypt to two
