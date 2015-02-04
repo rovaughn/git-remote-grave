@@ -2,6 +2,12 @@
 package main
 
 // TODO: The temporary unpacking dir should default to the current git dir.
+// TODO: Consider: replace the field FetchResult.Hash with ETag, which will
+//       then store ETag for use with the server.  The hash would no longer
+//       need to be computed on download.  The alternative is that the ETag
+//       should be checked against the derived Hash.
+//       Also, instead of the ETag being a hash, it could be the nonce.
+//       this is less generic though.
 
 import (
 	"archive/tar"
@@ -63,7 +69,7 @@ func PromptSecret(message string) (response string, err error) {
 type FetchResult struct {
 	Initial         bool
 	TempDir         string
-	Hash            []byte
+	ETag            string
 	Key             *Key
 	URL             string
 	User            *neturl.Userinfo
@@ -314,48 +320,29 @@ func AuthNewRequest(method string, urlstr string, body io.Reader) (*http.Request
 	return req, nil
 }
 
-func DecryptWithHash(reader io.Reader, key *Key) ([]byte, []byte, error) {
-	hasher := sha256.New()
-
-	encryptedData, err := ioutil.ReadAll(io.TeeReader(reader, hasher))
-	if err != nil {
-		return nil, nil, err
-	}
-
-	hash := make([]byte, 0, hasher.Size())
-	hash = hasher.Sum(hash)
-
-	decryptedData, err := Decrypt(encryptedData, &key.Key)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return decryptedData, hash, nil
-}
-
-func GetDecryptedFile(path string, key *Key) ([]byte, []byte, error) {
-	file, err := os.Open(path)
-	if os.IsNotExist(err) {
-		return nil, nil, &ErrNotFound{path}
+func GetDecryptedFile(path string, key *Key) ([]byte, error) {
+	if data, err := ioutil.ReadFile(path); os.IsNotExist(err) {
+		return nil, &ErrNotFound{path}
 	} else if err != nil {
-		return nil, nil, err
+		return nil, err
+	} else {
+		return Decrypt(data, &key.Key)
 	}
-	defer file.Close()
-
-	return DecryptWithHash(file, key)
 }
 
-func GetDecryptedHTTP(url string, key *Key) (data []byte, hash []byte, user *neturl.Userinfo, err error) {
-	var cachedHash []byte
+func GetDecryptedHTTP(url string, key *Key) (data []byte, etag string, user *neturl.Userinfo, err error) {
+	var cachedETagBytes []byte
 	var res *http.Response
 
-	cachedHashPath := pathlib.Join(LocalDir, "cached-hash")
+	cachedETagPath := pathlib.Join(LocalDir, "cached-etag")
 	cachedDataPath := pathlib.Join(LocalDir, "cached-data")
 
-	cachedHash, err = ioutil.ReadFile(cachedHashPath)
+	cachedETagBytes, err = ioutil.ReadFile(cachedETagPath)
 	if err != nil && !os.IsNotExist(err) {
 		return
 	}
+
+	cachedETag := string(cachedETagBytes)
 
 	res, user, err = AuthorizedRequest(func() (*http.Request, error) {
 		req, err := AuthNewRequest("GET", url, nil)
@@ -363,7 +350,7 @@ func GetDecryptedHTTP(url string, key *Key) (data []byte, hash []byte, user *net
 			return nil, err
 		}
 
-		req.Header.Set("If-None-Match", hex.EncodeToString(cachedHash))
+		req.Header.Set("If-None-Match", cachedETag)
 
 		if user != nil {
 			if pw, ok := user.Password(); ok {
@@ -389,7 +376,7 @@ func GetDecryptedHTTP(url string, key *Key) (data []byte, hash []byte, user *net
 			return
 		}
 
-		hash = cachedHash
+		etag = cachedETag
 
 		return
 	} else if res.StatusCode != http.StatusOK {
@@ -397,33 +384,43 @@ func GetDecryptedHTTP(url string, key *Key) (data []byte, hash []byte, user *net
 		return
 	}
 
-	data, hash, err = DecryptWithHash(res.Body, key)
+	var encrypted []byte
+
+	encrypted, err = ioutil.ReadAll(res.Body)
+	if err != nil {
+		return
+	}
+
+	data, err = Decrypt(encrypted, &key.Key)
+	if err != nil {
+		return
+	}
 
 	if err = ioutil.WriteFile(cachedDataPath, data, 0666); err != nil {
 		return
 	}
 
-	if err = ioutil.WriteFile(cachedHashPath, hash, 0666); err != nil {
+	if err = ioutil.WriteFile(cachedETagPath, []byte(res.Header.Get("ETag")), 0666); err != nil {
 		return
 	}
 
 	return
 }
 
-func GetDecryptedData(url string, key *Key) ([]byte, []byte, *neturl.Userinfo, error) {
+func GetDecryptedData(url string, key *Key) ([]byte, string, *neturl.Userinfo, error) {
 	parsedURL, err := neturl.Parse(url)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, "", nil, err
 	}
 
 	switch parsedURL.Scheme {
 	case "", "file":
-		data, hash, err := GetDecryptedFile(parsedURL.Path, key)
-		return data, hash, nil, err
+		data, err := GetDecryptedFile(parsedURL.Path, key)
+		return data, "", nil, err
 	case "http", "https":
 		return GetDecryptedHTTP(url, key)
 	default:
-		return nil, nil, nil, fmt.Errorf("Unsupported URL scheme %#v", parsedURL.Scheme)
+		return nil, "", nil, fmt.Errorf("Unsupported URL scheme %#v", parsedURL.Scheme)
 	}
 }
 
@@ -585,10 +582,10 @@ func Push(fetched *FetchResult, url string) error {
 				req.SetBasicAuth(fetched.User.Username(), pw)
 			}
 
-			if fetched.Hash == nil {
+			if fetched.ETag == "" {
 				req.Header.Set("If-Match", "nil")
 			} else {
-				req.Header.Set("If-Match", hex.EncodeToString(fetched.Hash))
+				req.Header.Set("If-Match", fetched.ETag)
 			}
 
 			req.ContentLength = int64(len(encryptedArchive))
@@ -678,7 +675,7 @@ func Fetch(url string) (*FetchResult, error) {
 		return nil, &Suberr{"GetKey", err}
 	}
 
-	decryptedArchive, hash, user, err := GetDecryptedData(url, key)
+	decryptedArchive, etag, user, err := GetDecryptedData(url, key)
 	if _, ok := err.(*ErrNotFound); ok {
 		return EmptyFetch(url, key)
 	} else if err != nil {
@@ -720,7 +717,7 @@ func Fetch(url string) (*FetchResult, error) {
 
 	return &FetchResult{
 		TempDir:         tempdir,
-		Hash:            hash,
+		ETag:            etag,
 		Key:             key,
 		URL:             url,
 		User:            user,
