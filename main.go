@@ -1,14 +1,6 @@
 //go:generate ./generate-bindata
 package main
 
-// TODO: The temporary unpacking dir should default to the current git dir.
-// TODO: Consider: replace the field FetchResult.Hash with ETag, which will
-//       then store ETag for use with the server.  The hash would no longer
-//       need to be computed on download.  The alternative is that the ETag
-//       should be checked against the derived Hash.
-//       Also, instead of the ETag being a hash, it could be the nonce.
-//       this is less generic though.
-
 import (
 	"archive/tar"
 	"bufio"
@@ -224,7 +216,6 @@ func GetKey(options ...KeyOption) (*Key, error) {
 		return CreateKey(source)
 	}
 
-beginning:
 	//          -- 80 chars --------------------------------------------------------------------
 	Userprintf("A key will be needed to decrypt the repository when it's fetched.  The key will\n")
 	Userprintf("be stored so that future fetches and pushes do not require you to see this\n")
@@ -238,21 +229,21 @@ beginning:
 	answer, err := Prompt(fmt.Sprintf("Type a number 1-%d: ", len(options)))
 	if err != nil {
 		Userprintf("%s\n", err)
-		goto beginning
+		return nil, fmt.Errorf("Invalid key option.")
 	}
 
 	answerN, err := strconv.Atoi(answer)
 	if err != nil {
 		Userprintf("%s\n", err)
-		goto beginning
+		return nil, fmt.Errorf("Invalid key option.")
 	} else if answerN <= 0 || answerN > len(options) {
 		Userprintf("Please choose a valid option.\n")
-		goto beginning
+		return nil, fmt.Errorf("Invalid key option")
 	}
 
 	if key, err := options[answerN-1].Procedure(); err != nil {
 		Userprintf("%s\n", err)
-		goto beginning
+		return nil, fmt.Errorf("Invalid key option")
 	} else {
 		return key, nil
 	}
@@ -459,7 +450,7 @@ func Exec(bin string, args ...string) error {
 }
 
 func EmptyFetch(url string, key *Key) (*FetchResult, error) {
-	tempdir, err := ioutil.TempDir("", "grave-temp-repo-")
+	tempdir, err := ioutil.TempDir(LocalDir, "grave-temp-repo-")
 	if err != nil {
 		return nil, &Suberr{"ioutil.TempDir", err}
 	}
