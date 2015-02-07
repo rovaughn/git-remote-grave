@@ -397,7 +397,9 @@ func GetDecryptedHTTP(url string, key *Key) (data []byte, etag string, err error
 		return
 	}
 
-	if err = ioutil.WriteFile(cachedETagPath, []byte(res.Header.Get("ETag")), 0666); err != nil {
+	etag = res.Header.Get("ETag")
+
+	if err = ioutil.WriteFile(cachedETagPath, []byte(etag), 0666); err != nil {
 		return
 	}
 
