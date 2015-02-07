@@ -601,49 +601,6 @@ func Push(fetched *FetchResult, url string) error {
 	}
 }
 
-// TODO: Instead of passing around URLs as strings, passing them around as *net.URLs
-//       would be better.
-func GetRemoteHash(url string) ([]byte, *neturl.Userinfo, error) {
-	parsedURL, err := neturl.Parse(url)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	switch parsedURL.Scheme {
-	case "http", "https":
-		res, user, err := AuthorizedRequest(func() (*http.Request, error) {
-			return AuthNewRequest("GET", url+"/hash", nil)
-		})
-		if err != nil {
-			return nil, nil, err
-		} else if res.StatusCode == http.StatusNotFound {
-			res.Body.Close()
-			return nil, nil, &ErrNotFound{url}
-		} else if res.StatusCode != http.StatusOK {
-			res.Body.Close()
-			return nil, nil, &ErrHTTPStatus{res, url}
-		}
-		defer res.Body.Close()
-
-		hexhash, err := ioutil.ReadAll(res.Body)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		hexhash = bytes.TrimSpace(hexhash)
-
-		hash := make([]byte, hex.DecodedLen(len(hexhash)))
-
-		if _, err := hex.Decode(hash, hexhash); err != nil {
-			return nil, nil, err
-		}
-
-		return hash, user, nil
-	default:
-		return nil, nil, fmt.Errorf("Unsupported remote hash scheme: %s", parsedURL.Scheme)
-	}
-}
-
 func AddURLUser(url string, user *neturl.Userinfo) (string, error) {
 	parsed, err := neturl.Parse(url)
 	if err != nil {
