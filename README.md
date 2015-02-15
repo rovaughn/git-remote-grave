@@ -44,6 +44,11 @@ Three options are provided:
 You can also set the environment variable `GRAVE_KEYFILE` to a file to use as
 the keysource.  This may be useful in scripts.
 
+Online storage
+--------------
+
+If you need a reliable place to store encrypted git repositories, [filegrave.com](https://filegrave.com/?origin=gh) has options.
+
 Encryption
 ----------
 
@@ -72,5 +77,4 @@ maximum compression level.
 
 The combination of these techniques typically reduces the repository size by
 78%.
-
 
