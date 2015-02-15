@@ -23,6 +23,11 @@ Example with HTTP:
     Cloning into 'private-repo'...
     Checking connectivity... done.
 
+How do you make something like this?
+------------------------------------
+
+I did a write-up [here](https://rovaughn.github.io/2015-2-9.html).
+
 Using a key
 -----------
 
