@@ -488,7 +488,7 @@ func (e *Suberr) Error() string {
 }
 
 func Push(fetched *FetchResult, url string) error {
-	gitEmpty, err := Asset("empty.git")
+	gitEmpty, err := Asset("empty.git.tar")
 	if err != nil {
 		return err
 	}
@@ -618,7 +618,7 @@ func AddURLUser(url string, user *neturl.Userinfo) (string, error) {
 }
 
 func Fetch(url string) (*FetchResult, error) {
-	emptyGit, err := Asset("empty.git")
+	emptyGit, err := Asset("empty.git.tar")
 	if err != nil {
 		return nil, err
 	}
