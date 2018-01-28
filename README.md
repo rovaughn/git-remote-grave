@@ -19,7 +19,7 @@ Example with a local file:
 
 Example with HTTP:
 
-    $ git clone grave::https://filegrave.com/username/private-repo
+    $ git clone grave::https://example.com/username/private-repo
     Cloning into 'private-repo'...
     Checking connectivity... done.
 
@@ -48,11 +48,6 @@ Three options are provided:
 
 You can also set the environment variable `GRAVE_KEYFILE` to a file to use as
 the keysource.  This may be useful in scripts.
-
-Online storage
---------------
-
-If you need a reliable place to store encrypted git repositories, [filegrave.com](https://filegrave.com/?origin=gh) has options.
 
 Encryption
 ----------
