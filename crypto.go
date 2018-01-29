@@ -7,26 +7,27 @@ import (
 )
 
 var (
-	ErrBoxTooShort = errors.New("Payload is too short to decrypt.")
-	ErrBoxInvalid  = errors.New("Payload failed to decrypt.")
+	errBoxTooShort = errors.New("payload is too short to decrypt")
+	errBoxInvalid  = errors.New("payload failed to decrypt")
 )
 
-func Decrypt(src []byte, key *[32]byte) ([]byte, error) {
+func decrypt(src []byte, key *[32]byte) ([]byte, error) {
 	if len(src) < 24 {
-		return nil, ErrBoxTooShort
+		return nil, errBoxTooShort
 	}
 
 	var nonce [24]byte
 	copy(nonce[:], src[0:24])
 
-	if result, ok := secretbox.Open(nil, src[24:], &nonce, key); !ok {
-		return nil, ErrBoxInvalid
-	} else {
-		return result, nil
+	result, ok := secretbox.Open(nil, src[24:], &nonce, key)
+	if !ok {
+		return nil, errBoxInvalid
 	}
+
+	return result, nil
 }
 
-func Encrypt(src []byte, key *[32]byte) ([]byte, error) {
+func encrypt(src []byte, key *[32]byte) ([]byte, error) {
 	var nonce [24]byte
 
 	if _, err := rand.Read(nonce[:]); err != nil {

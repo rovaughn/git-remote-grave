@@ -1,5 +1,5 @@
-#!/bin/bash -ue
-
+#!/bin/sh
+set -eux
 cd generate-empty.git.tar
 go-bindata -o ../bindata.go empty.git.tar
 

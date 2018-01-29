@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	ZeroTime = time.Unix(0, 0)
+	zeroTime = time.Unix(0, 0)
 )
 
 func verifyName(name string) error {
@@ -21,14 +21,14 @@ func verifyName(name string) error {
 
 	for _, component := range components {
 		if component == ".." {
-			return fmt.Errorf("%s contains ..", name)
+			return fmt.Errorf("%s refers to a parent directory", name)
 		}
 	}
 
 	return nil
 }
 
-// Unpacks a tar.Reader into the given root directory.
+// Unpack unpacks a tar.Reader into the given root directory.
 func Unpack(root string, reader *tar.Reader) error {
 	for {
 		header, err := reader.Next()
@@ -62,22 +62,12 @@ func Unpack(root string, reader *tar.Reader) error {
 
 			file.Close()
 		} else {
-			return fmt.Errorf("%s is not a regular file or directory.", header.Name)
+			return fmt.Errorf("%s is not a regular file or directory", header.Name)
 		}
 	}
 }
 
-type Packer struct {
-	reader   io.Reader
-	archiver *tar.Writer
-}
-
-func (p *Packer) Read(b []byte) (int, error) {
-	n, err := p.reader.Read(b)
-	return n, err
-}
-
-func Pack(archiver *tar.Writer, root string, entries []string) error {
+func pack(archiver *tar.Writer, root string, entries []string) error {
 	sort.Sort(sort.StringSlice(entries))
 
 	for _, entry := range entries {
@@ -98,13 +88,13 @@ func Pack(archiver *tar.Writer, root string, entries []string) error {
 		}
 
 		header.Name = entry
-		header.ModTime = ZeroTime
+		header.ModTime = zeroTime
 		header.Uid = 0
 		header.Gid = 0
 		header.Uname = ""
 		header.Gname = ""
-		header.AccessTime = ZeroTime
-		header.ChangeTime = ZeroTime
+		header.AccessTime = zeroTime
+		header.ChangeTime = zeroTime
 
 		if finfo.IsDir() {
 			if err := archiver.WriteHeader(header); err != nil {
@@ -120,7 +110,7 @@ func Pack(archiver *tar.Writer, root string, entries []string) error {
 				subentries[j] = path.Join(entry, subentries[j])
 			}
 
-			if err := Pack(archiver, root, subentries); err != nil {
+			if err := pack(archiver, root, subentries); err != nil {
 				return err
 			}
 		} else if finfo.Mode().IsRegular() {
@@ -141,22 +131,15 @@ func Pack(archiver *tar.Writer, root string, entries []string) error {
 	return nil
 }
 
-// Returns a reader that produces bytes of a tar archive produced by packing
-// the entries under root.  The names are always sorted.
-func NewPacker(root string, entries ...string) *Packer {
+// Pack returns a reader that produces bytes of a tar archive produced by
+// packing the entries under root.  The names are always sorted.
+func Pack(root string, entries ...string) io.ReadCloser {
 	reader, writer := io.Pipe()
 
-	archiver := tar.NewWriter(writer)
-
-	packer := &Packer{
-		reader:   reader,
-		archiver: archiver,
-	}
-
 	go func() {
-		//defer archiver.Close()
+		archiver := tar.NewWriter(writer)
 
-		packErr := Pack(archiver, root, entries)
+		packErr := pack(archiver, root, entries)
 		archiverErr := archiver.Close()
 
 		if packErr != nil {
@@ -168,5 +151,5 @@ func NewPacker(root string, entries ...string) *Packer {
 		}
 	}()
 
-	return packer
+	return reader
 }

@@ -28,7 +28,7 @@ func TestTouch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	} else if !bytes.Equal(data, []byte("hello")) {
-		t.Error("The contents of the temporary file were modified after being touched; they were %#v", data)
+		t.Errorf("The contents of the temporary file were modified after being touched; they were %#v", data)
 	}
 
 	if err := os.Remove(filename); err != nil {
